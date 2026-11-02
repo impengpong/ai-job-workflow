@@ -1,0 +1,16 @@
+private/
+output/
+.env
+.env.*
+!.env.example
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+*.log
+*.sqlite*
+*.db
+*.pem
+*.key
+*storage-state*.json
+*cookie*.json

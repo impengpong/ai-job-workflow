@@ -1,0 +1,19 @@
+{
+  "jobs": [
+    {
+      "key": "demo:001",
+      "platform": "示例平台",
+      "company": "示例科技（虚构）",
+      "title": "产品运营（演示）",
+      "url": "https://example.com/jobs/001",
+      "location": "示例城市",
+      "salary": "面议",
+      "description": "演示岗位：整理用户反馈，分析产品使用数据。此记录不对应真实招聘。",
+      "match_reason": "仅用于展示筛选页交互，非真实推荐。",
+      "unknowns": [
+        "薪资及实际招聘状态待核"
+      ],
+      "checked_at": null
+    }
+  ]
+}

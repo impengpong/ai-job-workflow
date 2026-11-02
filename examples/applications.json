@@ -1,0 +1,24 @@
+{
+  "jobs": [
+    {
+      "key": "demo:001",
+      "platform": "示例平台",
+      "job_url": "https://example.com/jobs/001",
+      "application": {
+        "status": "not_started",
+        "evidence": [],
+        "checked_at": null
+      },
+      "message": {
+        "status": "not_started",
+        "evidence": [],
+        "checked_at": null
+      },
+      "attachment": {
+        "status": "not_started",
+        "evidence": [],
+        "checked_at": null
+      }
+    }
+  ]
+}

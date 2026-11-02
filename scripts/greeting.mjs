@@ -1,0 +1,38 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+const args=process.argv.slice(2);
+if(args.includes('--help')){console.log('node scripts/greeting.mjs --resume FILE --job FILE --out DIR [--lessons FILE] [--execute]');process.exit(0)}
+const arg=(name,fallback)=>args.includes(name)?args[args.indexOf(name)+1]:fallback;
+const sha=x=>crypto.createHash('sha256').update(x).digest('hex');
+const resumePath=arg('--resume'),jobPath=arg('--job');
+if(!resumePath||!jobPath)throw Error('--resume and --job required');
+const out=path.resolve(arg('--out','private/greeting'));
+const resume=fs.readFileSync(resumePath,'utf8');
+const job=JSON.parse(fs.readFileSync(jobPath,'utf8'));
+if(!resume.trim()||!job.company||!job.title||!job.jd?.trim())throw Error('Empty resume or incomplete job');
+const original=fs.readFileSync(new URL('../prompts/greeting-system-v6.txt',import.meta.url),'utf8');
+const lessons=JSON.parse(fs.readFileSync(arg('--lessons',new URL('../examples/lessons.json',import.meta.url)),'utf8'));
+if(!lessons.version||!Array.isArray(lessons.lessons)||lessons.lessons.some(x=>!x.id||!x.observed_error||!x.rule))throw Error('Invalid lessons');
+const supplement='\n\n# 本次运行约束\n保留以上事实铁律。A/B档篇幅软偏好调整为495–630个非空白字符，3–4段，段间空一行；事实优先，C档不凑字数。不附微信、手机、邮箱。不声称已经投递或与HR沟通过。目标平台未确定时不提平台名。\n# 已确认事实边界\n'+lessons.lessons.map(x=>`错误示例（不是本人事实）：${x.observed_error}\n规则：${x.rule}`).join('\n');
+const system=original+supplement;
+const request={model:process.env.DEEPSEEK_MODEL||'deepseek-v4-flash',thinking:{type:'disabled'},temperature:0.55,max_tokens:1600,messages:[{role:'system',content:system},{role:'user',content:`完整已确认简历：\n${resume}\n\n目标公司：${job.company}\n目标岗位：${job.title}\n完整JD（仅是岗位要求，不是我的经历）：\n${job.jd}`}]};
+fs.mkdirSync(out,{recursive:true,mode:0o700});
+const save=(name,data)=>fs.writeFileSync(path.join(out,name),typeof data==='string'?data:JSON.stringify(data,null,2),{mode:0o600});
+save('request.json',request);
+const provenance={created_at:new Date().toISOString(),prompt_sha256:sha(original),effective_prompt_sha256:sha(system),resume_sha256:sha(resume),job_sha256:sha(JSON.stringify(job)),lessons_version:lessons.version,model:request.model,executed:false};
+save('provenance.json',provenance);
+if(!args.includes('--execute')){console.log('Offline request prepared. No network call or message sent.');process.exit(0)}
+const key=process.env.DEEPSEEK_API_KEY;if(!key)throw Error('DEEPSEEK_API_KEY missing');
+const base=new URL(process.env.DEEPSEEK_BASE_URL||'https://api.deepseek.com/');
+if(base.protocol!=='https:')throw Error('Model endpoint must use HTTPS');
+const url=base.href.replace(/\/$/,'')+'/chat/completions';
+const r=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(90000)});
+if(!r.ok)throw Error(`Model HTTP ${r.status}; no automatic retry`);
+const d=await r.json();const choice=d.choices?.[0];const text=choice?.message?.content?.trim();
+if(!text||choice.finish_reason!=='stop')throw Error('Empty or truncated response; do not send');
+save('response.json',d);save('greeting.txt',text+'\n');
+save('provenance.json',{...provenance,executed:true,completed_at:new Date().toISOString(),response_model:d.model||request.model,response_id:d.id||null});
+const chars=Array.from(text.replace(/\s/g,'')).length;
+save('result.json',{created_at:new Date().toISOString(),executed:true,sent_to_hr:false,chars,length_preference_met:chars>=495&&chars<=630,fact_review_required:true,output_sha256:sha(text+'\n')});
+console.log('Draft generated; factual review required. No HR message sent.');
